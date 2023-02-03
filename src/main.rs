@@ -31,34 +31,52 @@ struct TwitchClient {
 
 impl TwitchClient {
     fn new() -> TwitchClient {
-        let reqwest_client = blocking::Client::new();
         let mut config = Config::new();
-        let client_id = config.get_client_id();
-        let client_secret = config.get_client_secret();
         TwitchClient {
-            reqwest_client,
-            client_id,
-            client_secret,
+            reqwest_client: blocking::Client::new(),
+            client_id: config.get_client_id(),
+            client_secret: config.get_client_secret(),
             token: "".to_owned(),
             headers: header::HeaderMap::new(),
         }
     }
 
     fn authenticate(&mut self) {
-        let body = self.get_oauth2_body();
-        let response = self
-            .post(OAUTH2_URL)
-            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .body(body)
-            .send()
-            .expect("should be able to initiate oauth2 flow")
-            .json::<Token>()
-            .expect("should be able to parse oauth2 flow response");
-        self.token = response.access_token;
-        self.set_headers();
+        self.token = self.get_twitch_oauth2_token();
+        self.set_twitch_specific_headers();
     }
 
-    fn set_headers(&mut self) {
+    fn get_twitch_oauth2_token(&self) -> String {
+        let poster = self.get_auth_poster();
+        let response = TwitchClient::post_for_token(poster);
+        response.access_token
+    }
+
+    fn get_auth_poster(&self) -> blocking::RequestBuilder {
+        let body = self.get_oauth2_body();
+        self.post(OAUTH2_URL)
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(body)
+    }
+
+    fn post_for_token(poster: blocking::RequestBuilder) -> Token {
+        let response = TwitchClient::send_auth_poster(poster);
+        TwitchClient::parse_auth_response(response)
+    }
+
+    fn send_auth_poster(poster: blocking::RequestBuilder) -> blocking::Response {
+        poster
+            .send()
+            .expect("should be able to initiate oauth2 flow")
+    }
+
+    fn parse_auth_response(response: blocking::Response) -> Token {
+        response
+            .json::<Token>()
+            .expect("should be able to parse oauth2 flow response")
+    }
+
+    fn set_twitch_specific_headers(&mut self) {
         let mut headers = header::HeaderMap::new();
         let auth_header = self.get_auth_header();
         let client_id_header = self.get_client_id_header();
@@ -81,7 +99,7 @@ impl TwitchClient {
 
     fn get_total_hours(&self, broadcaster_name: &str) -> u32 {
         let schedule = self.get_schedule(broadcaster_name);
-        // dbg!(&schedule);
+        dbg!(&schedule);
         0
     }
 
