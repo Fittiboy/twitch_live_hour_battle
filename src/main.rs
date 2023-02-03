@@ -1,4 +1,11 @@
+use reqwest::{blocking, header, IntoUrl};
+use serde::Deserialize;
+use serde_json::{Number, Value};
 use std::path::PathBuf;
+
+const OAUTH2_URL: &str = "https://id.twitch.tv/oauth2/token";
+const SCHEDULE_URL: &str = "https://api.twitch.tv/helix/schedule";
+const USERS_URL: &str = "https://api.twitch.tv/helix/users";
 
 fn main() {
     let client = get_app_access_client();
@@ -13,33 +20,129 @@ fn get_app_access_client() -> TwitchClient {
     client
 }
 
+#[derive(Debug)]
 struct TwitchClient {
+    reqwest_client: reqwest::blocking::Client,
     client_id: String,
     client_secret: String,
     token: String,
+    headers: header::HeaderMap,
 }
 
 impl TwitchClient {
     fn new() -> TwitchClient {
+        let reqwest_client = blocking::Client::new();
         let mut config = Config::new();
         let client_id = config.get_client_id();
         let client_secret = config.get_client_secret();
         TwitchClient {
+            reqwest_client,
             client_id,
             client_secret,
             token: "".to_owned(),
+            headers: header::HeaderMap::new(),
         }
     }
 
     fn authenticate(&mut self) {
-        self.token = "".to_owned();
+        let body = self.get_oauth2_body();
+        let response = self
+            .post(OAUTH2_URL)
+            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .body(body)
+            .send()
+            .expect("should be able to initiate oauth2 flow")
+            .json::<Token>()
+            .expect("should be able to parse oauth2 flow response");
+        self.token = response.access_token;
+        self.set_headers();
+    }
+
+    fn set_headers(&mut self) {
+        let mut headers = header::HeaderMap::new();
+        let auth_header = self.get_auth_header();
+        let client_id_header = self.get_client_id_header();
+        headers.insert(header::AUTHORIZATION, auth_header);
+        headers.insert("Client-Id", client_id_header);
+
+        self.headers = headers;
+    }
+
+    fn get_oauth2_body(&self) -> String {
+        format!(
+            "client_id={}&client_secret={}&grant_type=client_credentials",
+            self.client_id, self.client_secret
+        )
+    }
+
+    fn post<U: IntoUrl>(&self, url: U) -> blocking::RequestBuilder {
+        self.reqwest_client.post(url).headers(self.headers.clone())
     }
 
     fn get_total_hours(&self, broadcaster_name: &str) -> u32 {
+        let schedule = self.get_schedule(broadcaster_name);
+        // dbg!(&schedule);
         0
+    }
+
+    fn get_schedule(&self, broadcaster_name: &str) -> Schedule {
+        let query = self.get_schedule_query(broadcaster_name);
+        let res = self
+            .get(SCHEDULE_URL)
+            .query(&[query])
+            .send()
+            .expect("should always be able to get schedule after acquiring broadcaster id");
+        dbg!(&res);
+        res.json::<Schedule>()
+            .expect("should be able to parse correct schedule response")
+    }
+
+    fn get_schedule_query(&self, broadcaster_name: &str) -> (String, String) {
+        let broadcaster_id = self.get_broadcaster_id(broadcaster_name);
+        ("broadcaster_id".to_owned(), broadcaster_id)
+    }
+
+    fn get_broadcaster_id(&self, broadcaster_name: &str) -> String {
+        let query = self.get_id_query(broadcaster_name);
+        let response = self
+            .get(USERS_URL)
+            .query(&[query])
+            .send()
+            .expect("should be able to get user ID for broadcaster login")
+            .json::<Users>()
+            .expect("should be able to parse user ID response");
+        TwitchClient::extract_id_from_response(response)
+    }
+
+    fn extract_id_from_response(response: Users) -> String {
+        let user = response.data.into_iter().next().expect(
+            "if the login given was correct, there should always be one user in the response",
+        );
+        user.id
+    }
+
+    fn get_id_query(&self, broadcaster_name: &str) -> (String, String) {
+        ("login".to_owned(), broadcaster_name.to_string())
+    }
+
+    fn get<U: IntoUrl>(&self, url: U) -> blocking::RequestBuilder {
+        self.reqwest_client.get(url).headers(self.headers.clone())
+    }
+
+    fn get_auth_header(&self) -> header::HeaderValue {
+        format!("Bearer {}", self.token)
+            .parse()
+            .expect("it should always be possible to parse this header")
+    }
+
+    fn get_client_id_header(&self) -> header::HeaderValue {
+        self.client_id
+            .parse()
+            .expect("it should always be possible to parse this header")
     }
 }
 
+#[derive(Debug)]
 struct Config {
     dir: PathBuf,
 }
@@ -53,8 +156,9 @@ impl Config {
 
     fn get_file_from_dir(&mut self, filename: &str) -> String {
         self.dir.set_file_name(filename);
-        std::fs::read_to_string(&self.dir)
-            .expect(&format!("{} should be in config directory", filename))
+        let file_contents = std::fs::read_to_string(&self.dir)
+            .expect(&format!("{} should be in config directory", filename));
+        file_contents.trim().to_owned()
     }
 
     fn get_client_id(&mut self) -> String {
@@ -64,4 +168,68 @@ impl Config {
     fn get_client_secret(&mut self) -> String {
         self.get_file_from_dir("client_secret.txt")
     }
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+struct Token {
+    access_token: String,
+    expires_in: Number,
+    token_type: String,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+struct Schedule {
+    data: Vec<Segment>,
+    broadcaster_id: String,
+    broadcaster_login: String,
+    vacation: Value,
+    pagination: Pagination,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+struct Segment {
+    id: String,
+    start_time: String,
+    end_time: String,
+    title: String,
+    canceled_until: String,
+    category: Category,
+    is_recurring: bool,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+struct Category {
+    id: String,
+    name: String,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+struct Pagination {
+    cursor: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Users {
+    data: Vec<User>,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Deserialize)]
+struct User {
+    id: String,
+    login: String,
+    display_name: String,
+    r#type: String,
+    broadcaster_type: String,
+    description: String,
+    profile_image_url: String,
+    offline_image_url: String,
+    view_count: Option<Number>,
+    email: Option<String>,
+    created_at: String,
 }
