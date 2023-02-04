@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::twitchclient::TwitchClient;
+use crate::twitch_client::TwitchClient;
 
 pub const OAUTH2_URL: &str = "https://id.twitch.tv/oauth2/token";
 pub const VIDEOS_URL: &str = "https://api.twitch.tv/helix/videos";
@@ -13,4 +13,4 @@ pub fn get_app_access_client() -> TwitchClient {
 
 pub mod config;
 pub mod requests;
-pub mod twitchclient;
+pub mod twitch_client;
