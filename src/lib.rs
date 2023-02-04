@@ -3,13 +3,13 @@ use crate::data_structures::{Users, Videos};
 use crate::requests::{Getter, OAuth2Body, Poster, VideosQuery};
 use reqwest::{blocking, header, IntoUrl};
 
-pub mod config;
-pub mod data_structures;
-pub mod requests;
+mod config;
+mod data_structures;
+mod requests;
 
-pub const OAUTH2_URL: &str = "https://id.twitch.tv/oauth2/token";
-pub const VIDEOS_URL: &str = "https://api.twitch.tv/helix/videos";
-pub const USERS_URL: &str = "https://api.twitch.tv/helix/users";
+const OAUTH2_URL: &str = "https://id.twitch.tv/oauth2/token";
+const VIDEOS_URL: &str = "https://api.twitch.tv/helix/videos";
+const USERS_URL: &str = "https://api.twitch.tv/helix/users";
 
 pub fn authenticated_twitch_client() -> TwitchClient {
     let mut client = TwitchClient::new();
@@ -43,25 +43,25 @@ impl TwitchClient {
         self.set_twitch_specific_headers();
     }
 
-    pub fn twitch_oauth2_token(&self) -> String {
+    fn twitch_oauth2_token(&self) -> String {
         let poster = self.auth_poster();
         let response = poster.post_for_token();
         response.access_token
     }
 
-    pub fn auth_poster(&self) -> Poster {
+    fn auth_poster(&self) -> Poster {
         let body = self.oauth2_body();
         Poster(self.post(OAUTH2_URL).form(&body))
     }
 
-    pub fn set_twitch_specific_headers(&mut self) {
+    fn set_twitch_specific_headers(&mut self) {
         let mut headers = header::HeaderMap::new();
         headers.insert(header::AUTHORIZATION, self.auth_header());
         headers.insert("Client-Id", self.client_id_header());
         self.headers = headers;
     }
 
-    pub fn oauth2_body(&self) -> OAuth2Body {
+    fn oauth2_body(&self) -> OAuth2Body {
         OAuth2Body {
             client_id: self.client_id.clone(),
             client_secret: self.client_secret.clone(),
@@ -69,7 +69,7 @@ impl TwitchClient {
         }
     }
 
-    pub fn post<U: IntoUrl>(&self, url: U) -> blocking::RequestBuilder {
+    fn post<U: IntoUrl>(&self, url: U) -> blocking::RequestBuilder {
         self.reqwest_client.post(url).headers(self.headers.clone())
     }
 
@@ -79,16 +79,16 @@ impl TwitchClient {
         0
     }
 
-    pub fn videos(&self, broadcaster_name: &str) -> Videos {
+    fn videos(&self, broadcaster_name: &str) -> Videos {
         self.videos_getter(broadcaster_name).videos()
     }
 
-    pub fn videos_getter(&self, broadcaster_name: &str) -> Getter {
+    fn videos_getter(&self, broadcaster_name: &str) -> Getter {
         let query = self.videos_query(broadcaster_name);
         Getter(self.get(VIDEOS_URL).query(&query))
     }
 
-    pub fn videos_query(&self, broadcaster_name: &str) -> VideosQuery {
+    fn videos_query(&self, broadcaster_name: &str) -> VideosQuery {
         VideosQuery {
             user_id: self.broadcaster_id(broadcaster_name),
             // "archive" represents just actual VODs of past streams
@@ -98,7 +98,7 @@ impl TwitchClient {
         }
     }
 
-    pub fn broadcaster_id(&self, broadcaster_name: &str) -> String {
+    fn broadcaster_id(&self, broadcaster_name: &str) -> String {
         let query = self.id_query_string(broadcaster_name);
         let response = self
             .get(USERS_URL)
@@ -110,28 +110,28 @@ impl TwitchClient {
         TwitchClient::broadcaster_id_from_api_response(response)
     }
 
-    pub fn broadcaster_id_from_api_response(response: Users) -> String {
+    fn broadcaster_id_from_api_response(response: Users) -> String {
         let user = response.data.into_iter().next().expect(
             "if the login given was correct, there should always be one user in the response",
         );
         user.id
     }
 
-    pub fn id_query_string(&self, broadcaster_name: &str) -> (String, String) {
+    fn id_query_string(&self, broadcaster_name: &str) -> (String, String) {
         ("login".to_owned(), broadcaster_name.to_string())
     }
 
-    pub fn get<U: IntoUrl>(&self, url: U) -> blocking::RequestBuilder {
+    fn get<U: IntoUrl>(&self, url: U) -> blocking::RequestBuilder {
         self.reqwest_client.get(url).headers(self.headers.clone())
     }
 
-    pub fn auth_header(&self) -> header::HeaderValue {
+    fn auth_header(&self) -> header::HeaderValue {
         format!("Bearer {}", self.token)
             .parse()
             .expect("it should always be possible to parse this header")
     }
 
-    pub fn client_id_header(&self) -> header::HeaderValue {
+    fn client_id_header(&self) -> header::HeaderValue {
         self.client_id
             .parse()
             .expect("it should always be possible to parse this header")

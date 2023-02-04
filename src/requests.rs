@@ -12,13 +12,13 @@ impl Poster {
         Poster::parse_auth_response(response)
     }
 
-    pub fn send_auth_poster(self) -> blocking::Response {
+    fn send_auth_poster(self) -> blocking::Response {
         self.0
             .send()
             .expect("should be able to initiate oauth2 flow")
     }
 
-    pub fn parse_auth_response(response: blocking::Response) -> Token {
+    fn parse_auth_response(response: blocking::Response) -> Token {
         response
             .json::<Token>()
             .expect("should be able to parse oauth2 flow response")

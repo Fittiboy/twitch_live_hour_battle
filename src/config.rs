@@ -14,11 +14,15 @@ impl Config {
         Config { dir }
     }
 
-    pub fn file_from_dir(&mut self, filename: &str) -> String {
-        self.dir.set_file_name(filename);
+    fn file_from_dir(&mut self, filename: &str) -> String {
+        self.select_file(filename);
         let file_contents = std::fs::read_to_string(&self.dir)
             .expect(&format!("{} should be in config directory", filename));
         file_contents.trim().to_owned()
+    }
+
+    fn select_file(&mut self, filename: &str) {
+        self.dir.set_file_name(filename);
     }
 
     pub fn client_id(&mut self) -> String {
