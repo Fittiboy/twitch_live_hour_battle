@@ -4,13 +4,13 @@ use serde_json::{Number, Value};
 use std::path::PathBuf;
 
 const OAUTH2_URL: &str = "https://id.twitch.tv/oauth2/token";
-const SCHEDULE_URL: &str = "https://api.twitch.tv/helix/schedule";
+const VIDEOS_URL: &str = "https://api.twitch.tv/helix/videos";
 const USERS_URL: &str = "https://api.twitch.tv/helix/users";
 
 fn main() {
     let client = get_app_access_client();
-    let yvonnie_hours = client.get_total_hours("yvonnie");
-    let kkatamina_hours = client.get_total_hours("kkatamina");
+    let yvonnie_hours = client.total_hours("yvonnie");
+    let kkatamina_hours = client.total_hours("kkatamina");
     println!("Yvonne:  {}h\nMiyoung: {}h", yvonnie_hours, kkatamina_hours);
 }
 
@@ -34,8 +34,8 @@ impl TwitchClient {
         let mut config = Config::new();
         TwitchClient {
             reqwest_client: blocking::Client::new(),
-            client_id: config.get_client_id(),
-            client_secret: config.get_client_secret(),
+            client_id: config.client_id(),
+            client_secret: config.client_secret(),
             token: "".to_owned(),
             headers: header::HeaderMap::new(),
         }
@@ -53,7 +53,7 @@ impl TwitchClient {
     }
 
     fn get_auth_poster(&self) -> blocking::RequestBuilder {
-        let body = self.get_oauth2_body();
+        let body = self.oauth2_body();
         self.post(OAUTH2_URL)
             .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
             .body(body)
@@ -78,15 +78,15 @@ impl TwitchClient {
 
     fn set_twitch_specific_headers(&mut self) {
         let mut headers = header::HeaderMap::new();
-        let auth_header = self.get_auth_header();
-        let client_id_header = self.get_client_id_header();
+        let auth_header = self.auth_header();
+        let client_id_header = self.client_id_header();
         headers.insert(header::AUTHORIZATION, auth_header);
         headers.insert("Client-Id", client_id_header);
 
         self.headers = headers;
     }
 
-    fn get_oauth2_body(&self) -> String {
+    fn oauth2_body(&self) -> String {
         format!(
             "client_id={}&client_secret={}&grant_type=client_credentials",
             self.client_id, self.client_secret
@@ -97,16 +97,16 @@ impl TwitchClient {
         self.reqwest_client.post(url).headers(self.headers.clone())
     }
 
-    fn get_total_hours(&self, broadcaster_name: &str) -> u32 {
-        let schedule = self.get_schedule(broadcaster_name);
+    fn total_hours(&self, broadcaster_name: &str) -> u32 {
+        let schedule = self.videos(broadcaster_name);
         dbg!(&schedule);
         0
     }
 
-    fn get_schedule(&self, broadcaster_name: &str) -> Schedule {
-        let query = self.get_schedule_query(broadcaster_name);
+    fn videos(&self, broadcaster_name: &str) -> Schedule {
+        let query = self.videos_query_string(broadcaster_name);
         let res = self
-            .get(SCHEDULE_URL)
+            .get(VIDEOS_URL)
             .query(&[query])
             .send()
             .expect("should always be able to get schedule after acquiring broadcaster id");
@@ -115,13 +115,13 @@ impl TwitchClient {
             .expect("should be able to parse correct schedule response")
     }
 
-    fn get_schedule_query(&self, broadcaster_name: &str) -> (String, String) {
-        let broadcaster_id = self.get_broadcaster_id(broadcaster_name);
-        ("broadcaster_id".to_owned(), broadcaster_id)
+    fn videos_query_string(&self, broadcaster_name: &str) -> (String, String) {
+        let broadcaster_id = self.broadcaster_id(broadcaster_name);
+        ("user_id".to_owned(), broadcaster_id)
     }
 
-    fn get_broadcaster_id(&self, broadcaster_name: &str) -> String {
-        let query = self.get_id_query(broadcaster_name);
+    fn broadcaster_id(&self, broadcaster_name: &str) -> String {
+        let query = self.id_query_string(broadcaster_name);
         let response = self
             .get(USERS_URL)
             .query(&[query])
@@ -129,17 +129,17 @@ impl TwitchClient {
             .expect("should be able to get user ID for broadcaster login")
             .json::<Users>()
             .expect("should be able to parse user ID response");
-        TwitchClient::extract_id_from_response(response)
+        TwitchClient::broadcaster_id_from_api_response(response)
     }
 
-    fn extract_id_from_response(response: Users) -> String {
+    fn broadcaster_id_from_api_response(response: Users) -> String {
         let user = response.data.into_iter().next().expect(
             "if the login given was correct, there should always be one user in the response",
         );
         user.id
     }
 
-    fn get_id_query(&self, broadcaster_name: &str) -> (String, String) {
+    fn id_query_string(&self, broadcaster_name: &str) -> (String, String) {
         ("login".to_owned(), broadcaster_name.to_string())
     }
 
@@ -147,13 +147,13 @@ impl TwitchClient {
         self.reqwest_client.get(url).headers(self.headers.clone())
     }
 
-    fn get_auth_header(&self) -> header::HeaderValue {
+    fn auth_header(&self) -> header::HeaderValue {
         format!("Bearer {}", self.token)
             .parse()
             .expect("it should always be possible to parse this header")
     }
 
-    fn get_client_id_header(&self) -> header::HeaderValue {
+    fn client_id_header(&self) -> header::HeaderValue {
         self.client_id
             .parse()
             .expect("it should always be possible to parse this header")
@@ -172,19 +172,19 @@ impl Config {
         Config { dir }
     }
 
-    fn get_file_from_dir(&mut self, filename: &str) -> String {
+    fn file_from_dir(&mut self, filename: &str) -> String {
         self.dir.set_file_name(filename);
         let file_contents = std::fs::read_to_string(&self.dir)
             .expect(&format!("{} should be in config directory", filename));
         file_contents.trim().to_owned()
     }
 
-    fn get_client_id(&mut self) -> String {
-        self.get_file_from_dir("client_id.txt")
+    fn client_id(&mut self) -> String {
+        self.file_from_dir("client_id.txt")
     }
 
-    fn get_client_secret(&mut self) -> String {
-        self.get_file_from_dir("client_secret.txt")
+    fn client_secret(&mut self) -> String {
+        self.file_from_dir("client_secret.txt")
     }
 }
 
