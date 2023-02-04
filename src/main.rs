@@ -42,17 +42,17 @@ impl TwitchClient {
     }
 
     fn authenticate(&mut self) {
-        self.token = self.get_twitch_oauth2_token();
+        self.token = self.twitch_oauth2_token();
         self.set_twitch_specific_headers();
     }
 
-    fn get_twitch_oauth2_token(&self) -> String {
-        let poster = self.get_auth_poster();
+    fn twitch_oauth2_token(&self) -> String {
+        let poster = self.auth_poster();
         let response = TwitchClient::post_for_token(poster);
         response.access_token
     }
 
-    fn get_auth_poster(&self) -> blocking::RequestBuilder {
+    fn auth_poster(&self) -> blocking::RequestBuilder {
         let body = self.oauth2_body();
         self.post(OAUTH2_URL)
             .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
@@ -103,7 +103,7 @@ impl TwitchClient {
         0
     }
 
-    fn videos(&self, broadcaster_name: &str) -> Schedule {
+    fn videos(&self, broadcaster_name: &str) -> Videos {
         let query = self.videos_query_string(broadcaster_name);
         let res = self
             .get(VIDEOS_URL)
@@ -111,7 +111,7 @@ impl TwitchClient {
             .send()
             .expect("should always be able to get schedule after acquiring broadcaster id");
         dbg!(&res);
-        res.json::<Schedule>()
+        res.json::<Videos>()
             .expect("should be able to parse correct schedule response")
     }
 
@@ -198,24 +198,31 @@ struct Token {
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
-struct Schedule {
-    data: Vec<Segment>,
-    broadcaster_id: String,
-    broadcaster_login: String,
-    vacation: Value,
+struct Videos {
+    data: Vec<Video>,
     pagination: Pagination,
 }
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
-struct Segment {
+struct Video {
     id: String,
-    start_time: String,
-    end_time: String,
+    stream_id: String,
+    user_id: String,
+    user_login: String,
+    user_name: String,
     title: String,
-    canceled_until: String,
-    category: Category,
-    is_recurring: bool,
+    description: String,
+    created_at: String,
+    published_at: String,
+    url: String,
+    thumbnail_url: String,
+    viewable: String,
+    view_count: Number,
+    language: String,
+    r#type: String,
+    duration: String,
+    muted_segments: Option<Value>,
 }
 
 #[allow(dead_code)]
