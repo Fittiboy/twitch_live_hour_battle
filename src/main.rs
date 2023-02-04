@@ -1,5 +1,5 @@
 use reqwest::{blocking, header, IntoUrl};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Number, Value};
 use std::path::PathBuf;
 
@@ -54,28 +54,22 @@ impl TwitchClient {
 
     fn auth_poster(&self) -> Poster {
         let body = self.oauth2_body();
-        Poster(
-            self.post(OAUTH2_URL)
-                .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-                .body(body),
-        )
+        Poster(self.post(OAUTH2_URL).form(&body))
     }
 
     fn set_twitch_specific_headers(&mut self) {
         let mut headers = header::HeaderMap::new();
-        let auth_header = self.auth_header();
-        let client_id_header = self.client_id_header();
-        headers.insert(header::AUTHORIZATION, auth_header);
-        headers.insert("Client-Id", client_id_header);
-
+        headers.insert(header::AUTHORIZATION, self.auth_header());
+        headers.insert("Client-Id", self.client_id_header());
         self.headers = headers;
     }
 
-    fn oauth2_body(&self) -> String {
-        format!(
-            "client_id={}&client_secret={}&grant_type=client_credentials",
-            self.client_id, self.client_secret
-        )
+    fn oauth2_body(&self) -> OAuth2Body {
+        OAuth2Body {
+            client_id: self.client_id.clone(),
+            client_secret: self.client_secret.clone(),
+            grant_type: "client_credentials".to_owned(),
+        }
     }
 
     fn post<U: IntoUrl>(&self, url: U) -> blocking::RequestBuilder {
@@ -198,6 +192,13 @@ impl Poster {
             .json::<Token>()
             .expect("should be able to parse oauth2 flow response")
     }
+}
+
+#[derive(Debug, Serialize)]
+struct OAuth2Body {
+    client_id: String,
+    client_secret: String,
+    grant_type: String,
 }
 
 #[derive(Debug)]
