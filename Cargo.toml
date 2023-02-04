@@ -1,5 +1,5 @@
 [package]
-name = "live_hours"
+name = "twitch_live_hour_battle"
 version = "0.1.0"
 edition = "2021"
 
