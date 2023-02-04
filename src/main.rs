@@ -87,13 +87,18 @@ impl TwitchClient {
     }
 
     fn videos_getter(&self, broadcaster_name: &str) -> Getter {
-        let query = self.videos_query_string(broadcaster_name);
-        Getter(self.get(VIDEOS_URL).query(&[query]))
+        let query = self.videos_query(broadcaster_name);
+        Getter(self.get(VIDEOS_URL).query(&query))
     }
 
-    fn videos_query_string(&self, broadcaster_name: &str) -> (String, String) {
-        let broadcaster_id = self.broadcaster_id(broadcaster_name);
-        ("user_id".to_owned(), broadcaster_id)
+    fn videos_query(&self, broadcaster_name: &str) -> VideosQuery {
+        VideosQuery {
+            user_id: self.broadcaster_id(broadcaster_name),
+            // "archive" represents just actual VODs of past streams
+            r#type: "archive".to_owned(),
+            // 100 is the maximum accepted value
+            first: "100".to_owned(),
+        }
     }
 
     fn broadcaster_id(&self, broadcaster_name: &str) -> String {
@@ -221,6 +226,13 @@ impl Getter {
             .json::<Videos>()
             .expect("should be able to parse correct schedule response")
     }
+}
+
+#[derive(Debug, Serialize)]
+struct VideosQuery {
+    user_id: String,
+    r#type: String,
+    first: String,
 }
 
 #[allow(dead_code)]
