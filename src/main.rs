@@ -48,32 +48,17 @@ impl TwitchClient {
 
     fn twitch_oauth2_token(&self) -> String {
         let poster = self.auth_poster();
-        let response = TwitchClient::post_for_token(poster);
+        let response = poster.post_for_token();
         response.access_token
     }
 
-    fn auth_poster(&self) -> blocking::RequestBuilder {
+    fn auth_poster(&self) -> Poster {
         let body = self.oauth2_body();
-        self.post(OAUTH2_URL)
-            .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .body(body)
-    }
-
-    fn post_for_token(poster: blocking::RequestBuilder) -> Token {
-        let response = TwitchClient::send_auth_poster(poster);
-        TwitchClient::parse_auth_response(response)
-    }
-
-    fn send_auth_poster(poster: blocking::RequestBuilder) -> blocking::Response {
-        poster
-            .send()
-            .expect("should be able to initiate oauth2 flow")
-    }
-
-    fn parse_auth_response(response: blocking::Response) -> Token {
-        response
-            .json::<Token>()
-            .expect("should be able to parse oauth2 flow response")
+        Poster(
+            self.post(OAUTH2_URL)
+                .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                .body(body),
+        )
     }
 
     fn set_twitch_specific_headers(&mut self) {
@@ -98,21 +83,18 @@ impl TwitchClient {
     }
 
     fn total_hours(&self, broadcaster_name: &str) -> u32 {
-        let schedule = self.videos(broadcaster_name);
-        dbg!(&schedule);
+        let videos = self.videos(broadcaster_name);
+        dbg!(&videos);
         0
     }
 
     fn videos(&self, broadcaster_name: &str) -> Videos {
+        self.videos_getter(broadcaster_name).videos()
+    }
+
+    fn videos_getter(&self, broadcaster_name: &str) -> Getter {
         let query = self.videos_query_string(broadcaster_name);
-        let res = self
-            .get(VIDEOS_URL)
-            .query(&[query])
-            .send()
-            .expect("should always be able to get schedule after acquiring broadcaster id");
-        dbg!(&res);
-        res.json::<Videos>()
-            .expect("should be able to parse correct schedule response")
+        Getter(self.get(VIDEOS_URL).query(&[query]))
     }
 
     fn videos_query_string(&self, broadcaster_name: &str) -> (String, String) {
@@ -194,6 +176,50 @@ struct Token {
     access_token: String,
     expires_in: Number,
     token_type: String,
+}
+
+#[derive(Debug)]
+struct Poster(blocking::RequestBuilder);
+
+impl Poster {
+    fn post_for_token(self) -> Token {
+        let response = self.send_auth_poster();
+        Poster::parse_auth_response(response)
+    }
+
+    fn send_auth_poster(self) -> blocking::Response {
+        self.0
+            .send()
+            .expect("should be able to initiate oauth2 flow")
+    }
+
+    fn parse_auth_response(response: blocking::Response) -> Token {
+        response
+            .json::<Token>()
+            .expect("should be able to parse oauth2 flow response")
+    }
+}
+
+#[derive(Debug)]
+struct Getter(blocking::RequestBuilder);
+
+impl Getter {
+    fn videos(self) -> Videos {
+        let response = self.get_videos();
+        Getter::parse_videos_response(response)
+    }
+
+    fn get_videos(self) -> blocking::Response {
+        self.0
+            .send()
+            .expect("should always be able to get schedule after acquiring broadcaster id")
+    }
+
+    fn parse_videos_response(response: blocking::Response) -> Videos {
+        response
+            .json::<Videos>()
+            .expect("should be able to parse correct schedule response")
+    }
 }
 
 #[allow(dead_code)]
