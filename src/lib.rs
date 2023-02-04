@@ -27,7 +27,7 @@ pub struct TwitchClient {
 }
 
 impl TwitchClient {
-    pub fn new() -> TwitchClient {
+    fn new() -> TwitchClient {
         let mut config = Config::new();
         TwitchClient {
             reqwest_client: blocking::Client::new(),
@@ -38,7 +38,7 @@ impl TwitchClient {
         }
     }
 
-    pub fn authenticate(&mut self) {
+    fn authenticate(&mut self) {
         self.token = self.twitch_oauth2_token();
         self.set_twitch_specific_headers();
     }
