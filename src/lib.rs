@@ -1,8 +1,10 @@
 use crate::config::Config;
-use crate::requests::{Getter, OAuth2Body, Poster, Users, Videos, VideosQuery};
+use crate::data_structures::{Users, Videos};
+use crate::requests::{Getter, OAuth2Body, Poster, VideosQuery};
 use reqwest::{blocking, header, IntoUrl};
 
 pub mod config;
+pub mod data_structures;
 pub mod requests;
 
 pub const OAUTH2_URL: &str = "https://id.twitch.tv/oauth2/token";
@@ -17,11 +19,11 @@ pub fn authenticated_twitch_client() -> TwitchClient {
 
 #[derive(Debug)]
 pub struct TwitchClient {
-    pub reqwest_client: reqwest::blocking::Client,
-    pub client_id: String,
-    pub client_secret: String,
-    pub token: String,
-    pub headers: header::HeaderMap,
+    reqwest_client: reqwest::blocking::Client,
+    client_id: String,
+    client_secret: String,
+    token: String,
+    headers: header::HeaderMap,
 }
 
 impl TwitchClient {

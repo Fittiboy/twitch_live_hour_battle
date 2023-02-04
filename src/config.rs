@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 #[derive(Debug)]
 pub struct Config {
-    pub dir: PathBuf,
+    dir: PathBuf,
 }
 
 impl Config {
