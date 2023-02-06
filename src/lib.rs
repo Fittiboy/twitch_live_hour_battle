@@ -76,7 +76,8 @@ impl TwitchClient {
     pub fn total_hours(&self, broadcaster_name: &str) -> u32 {
         let videos = self.videos(broadcaster_name);
         dbg!(&videos);
-        0
+        let hours = videos.hours();
+        hours
     }
 
     fn videos(&self, broadcaster_name: &str) -> Videos {

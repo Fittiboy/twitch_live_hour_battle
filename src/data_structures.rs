@@ -8,6 +8,23 @@ pub struct Videos {
     pub pagination: Pagination,
 }
 
+impl Videos {
+    pub fn hours(self) -> u32 {
+        let videos = self.videos_this_month();
+        videos
+            .into_iter()
+            .map(|video| video.hours_this_month())
+            .sum()
+    }
+
+    fn videos_this_month(self) -> Vec<Video> {
+        self.data
+            .into_iter()
+            .filter(|video| video.this_month())
+            .collect()
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
 pub struct Video {
@@ -28,6 +45,23 @@ pub struct Video {
     pub r#type: String,
     pub duration: String,
     pub muted_segments: Option<Value>,
+}
+
+impl Video {
+    fn this_month(&self) -> bool {
+        let end_time = self.end_time();
+        end_time > first_of_month() //TODO: Make `time_utils` module that wraps `time` crate
+    }
+
+    fn hours_this_month(&self) -> u32 {
+        1
+    }
+
+    fn end_time(&self) -> Time {
+        let start_time = timestamp(self.created_at);
+        let duration = timespan(self.duration);
+        start_time + duration
+    }
 }
 
 #[allow(dead_code)]
