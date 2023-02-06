@@ -6,6 +6,7 @@ use reqwest::{blocking, header, IntoUrl};
 mod config;
 mod data_structures;
 mod requests;
+mod time_utils;
 
 const OAUTH2_URL: &str = "https://id.twitch.tv/oauth2/token";
 const VIDEOS_URL: &str = "https://api.twitch.tv/helix/videos";

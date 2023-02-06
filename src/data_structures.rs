@@ -1,3 +1,4 @@
+use crate::time_utils::current_month;
 use serde::Deserialize;
 use serde_json::{Number, Value};
 
@@ -50,14 +51,15 @@ pub struct Video {
 impl Video {
     fn this_month(&self) -> bool {
         let end_time = self.end_time();
-        end_time > first_of_month() //TODO: Make `time_utils` module that wraps `time` crate
+        end_time.month() == current_month()
     }
 
     fn hours_this_month(&self) -> u32 {
         1
     }
 
-    fn end_time(&self) -> Time {
+    //TODO: Implement missing functions
+    fn end_time(&self) -> DateTime<Tz> {
         let start_time = timestamp(self.created_at);
         let duration = timespan(self.duration);
         start_time + duration
