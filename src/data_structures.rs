@@ -1,4 +1,6 @@
-use crate::time_utils::current_month;
+use crate::time_utils::{current_month, timespan, timestamp};
+use chrono::{DateTime, Datelike};
+use chrono_tz::Tz;
 use serde::Deserialize;
 use serde_json::{Number, Value};
 
@@ -58,10 +60,9 @@ impl Video {
         1
     }
 
-    //TODO: Implement missing functions
     fn end_time(&self) -> DateTime<Tz> {
-        let start_time = timestamp(self.created_at);
-        let duration = timespan(self.duration);
+        let start_time = timestamp(&self.created_at);
+        let duration = dbg!(timespan(&self.duration));
         start_time + duration
     }
 }
