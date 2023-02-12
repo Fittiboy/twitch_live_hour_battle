@@ -74,7 +74,7 @@ impl TwitchClient {
         self.reqwest_client.post(url).headers(self.headers.clone())
     }
 
-    pub fn total_hours(&self, broadcaster_name: &str) -> u32 {
+    pub fn total_hours(&self, broadcaster_name: &str) -> f64 {
         let videos = self.videos(broadcaster_name);
         dbg!(&videos);
         let hours = videos.hours();

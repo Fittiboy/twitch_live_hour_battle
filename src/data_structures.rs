@@ -12,7 +12,7 @@ pub struct Videos {
 }
 
 impl Videos {
-    pub fn hours(self) -> u32 {
+    pub fn hours(self) -> f64 {
         let videos = self.videos_this_month();
         videos
             .into_iter()
@@ -56,13 +56,18 @@ impl Video {
         end_time.month() == current_month()
     }
 
-    fn hours_this_month(&self) -> u32 {
-        1
+    // TODO: This returns the total duration for the stream, not the duration of the part of the
+    // stream that matches the month. Remove the time from before the month from the total duration
+    // to return the correct duration
+    fn hours_this_month(&self) -> f64 {
+        let duration = timespan(&self.duration);
+        let seconds = duration.num_seconds();
+        seconds as f64 / 3600.
     }
 
     fn end_time(&self) -> DateTime<Tz> {
         let start_time = timestamp(&self.created_at);
-        let duration = dbg!(timespan(&self.duration));
+        let duration = timespan(&self.duration);
         start_time + duration
     }
 }
